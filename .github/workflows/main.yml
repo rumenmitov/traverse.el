@@ -1,0 +1,22 @@
+name: traverse.el Test Suite
+
+on:
+  push:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Emacs
+        uses: purcell/setup-emacs@master
+        with:
+          version: '29.1'
+
+      - name: Run ERT tests
+        run: |
+          emacs --batch \
+            --load ./traverse-tests.el \
+            --funcall ert-run-tests-batch-and-exit
+
