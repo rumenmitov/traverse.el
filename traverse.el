@@ -2,9 +2,9 @@
   "Toggle Traverse mode.
 
 When enabled, `xref-find-definitions' will push the current context (i.e. line)
-onto a tree structure. `xref-go-back' will move a level up the tree.
+onto a graph structure. `xref-go-back' will move a level up the graph.
 
-A tree visualization can be toggled with `traverse-toggle-tree-visualization'."
+A graph visualization can be toggled with `traverse-toggle-graph-visualization'."
   :global nil
   :init-value nil
   :lighter " Traverse"
@@ -12,149 +12,151 @@ A tree visualization can be toggled with `traverse-toggle-tree-visualization'."
 
   (if traverse-mode
       (progn
-        (setq traverse--root-node
-              (traverse--tree-root-init))
+        (setq traverse--root-node (traverse--root-init))
+        (setq traverse--all-child-nodes nil)
         
-        (setq traverse--current-node traverse--root-node)
-        
-        (advice-add 'xref-find-definitions :before #'traverse--goto-child)
-        (advice-add 'xref-go-back :after #'traverse--goto-parent))
+        (advice-add 'xref-find-definitions :around #'traverse--traverse)
+        (advice-add 'xref-go-back :around #'traverse--traverse))
     
     (progn
-      (setq traverse--root-node nil)
-      (setq traverse--current-node nil)
-      (advice-remove 'xref-find-definitions 'traverse--goto-child)
-      (advice-remove 'xref-go-back 'traverse--goto-parent))))
+      (advice-remove 'xref-find-definitions 'traverse--traverse)
+      (advice-remove 'xref-go-back 'traverse--traverse))))
 
 
 (require 'cl-lib)
 
 
-(cl-defstruct traverse--tree
-  "Tree structure for traversing a codebase.
+(cl-defstruct traverse--graph
+  "Graph structure for traversing a codebase.
 
 `context'   A node's context (i.e. the line contents).
-`parent'    The scope in which `context' resides.
+`parents'   Scopes in which `context' resides.
 `file'      The file in which `context' resides.
 `line'      The line number on which `context' resides.
 `children'  Nodes referenced within the scope of `context'."
   
   context
-  parent
+  parents
   file
   line
   children)
 
 
 (defvar traverse--root-node nil
-  "The root node of the traverse tree.")
+  "The starting node. It does not have a parent.")
 
-(defvar traverse--current-node nil
-  "The current node of the traverse tree.")
-
-
-(defun traverse--tree-root-init ()
-  "Creates a new `traverse--tree' root node."
-  (make-traverse--tree
-   :context 'root
-   :parent nil
-   :file nil
-   :line nil
-   :children '()))
+(defvar traverse--all-child-nodes nil
+  "All non-root nodes.")
 
 
-(defun traverse--goto-child (&rest rest)
-  "If the current context is present in the tree,
-sets `traverse--current-node' to that node.
+(defun traverse--root-init ()
+  "Creates an initialized root node."
+  (make-traverse--graph
+   :context      'root
+   :parents      nil
+   :file         nil
+   :line         nil
+   :children     nil))
 
-Otherwise, creates a new node and updates `traverse--current-node'
-to point to the new node."
+
+(defun traverse--traverse (oldfunc &rest rest)
+  "Handles traversal via `oldfunc'. The current context is
+registered as a parent node. The context after the traversal
+step is registered as a child node."
+
+  (let*
+      ((parent (traverse--handle-context-at-point))
+       (_      (apply oldfunc rest))
+       (child  (traverse--handle-context-at-point)))
+
+    (traverse--connect parent child)))
+
+
+(defun traverse--handle-context-at-point ()
+  "Finds (or creates) a node that describes the
+current context at point."
   
   (let*
-      ((context             (thing-at-point 'line t))
-       (file                (buffer-file-name))
-       (line                (line-number-at-pos))
-       (existent-node       (traverse--find traverse--root-node context file line)))
+      ((context          (thing-at-point 'line t))
+       (file             (buffer-file-name))
+       (line             (line-number-at-pos))
+       (existent-node    (traverse--find context file line)))
 
-    (setq traverse--current-node
-          (if existent-node
-              existent-node
-
-            ;; If node does not exist, create it!
-            (traverse--insert
-             traverse--current-node context file line)))))
+    (if existent-node
+        existent-node
+      (traverse--create context file line)))) 
 
 
-(defun traverse--find (root context file line)
+(defun traverse--find (context file line)
   "Returns the node which contains a matching
 `context', `file' and `line'. If no such node exists,
-returns nil.
+returns nil."
 
-The search begins from the node `root'."
-
-  ;; INFO
-  ;; Use DFS instead of BFS as the appeal of `traverse-mode' is
-  ;; in its ability to visualize deep backtraces.
-
-  (let*
-      ((root-context      (traverse--tree-context  root))
-       (root-file         (traverse--tree-file     root))
-       (root-line         (traverse--tree-line     root))
-       (root-children     (traverse--tree-children root)))
-    
-    (if (and
-         (stringp root-context)
-         (stringp root-file)
-         (numberp line)
-         (string= context root-context)
-         (string= file    root-file)
-         (=       line    root-line))
-        ;; If `context', `file', and `line' match, return `root'.
-        root
-
-      ;; Check if node exists in the sub-trees.
-      (seq-some
-            (lambda (child)
-              "Recurse on child."
-              (traverse--find child context file line))
-            root-children))))
+  (message "content: %s\nfile: %s\nline: %d\n" context file line)
+  (seq-some (lambda (node)
+                (let*
+                    ((node-context      (traverse--graph-context  node))
+                     (node-file         (traverse--graph-file     node))
+                     (node-line         (traverse--graph-line     node)))
+                  
+                  (if (and
+                       (string= context node-context)
+                       (string= file    node-file)
+                       (=       line    node-line))
+                      node
+                    nil)))
+            
+            traverse--all-child-nodes))
 
 
-(defun traverse--insert (parent context file line)
-  "Saves the `context', `file', and `line' into a new node, and
-adds it as a child to the node `parent'. Returns the new node."
+(defun traverse--create (context file line)
+  "Returns a new node with the provided `context', `file', and `line'."
   
-  (let*
-      ;; Create the child node.
-      ((child (make-traverse--tree
-               :context context
-               :parent parent
-               :file file
-               :line line
-               :children '())))
-
-    ;; Add the child node as a child to `parent'.
-    (setf (traverse--tree-children parent)
-          (cons child
-                (traverse--tree-children parent)))
-
-    ;; Return the new node.
-    child))
+      (make-traverse--graph
+       :context context
+       :parents nil
+       :file file
+       :line line
+       :children nil))
 
 
-(defun traverse--goto-parent (&rest rest)
-  "Updates `traverse--current-node' to refer to its parent node.
-If `traverse--current-node' is the root node, nothing happens."
+(defun traverse--connect (parent child)
+  "Connects `parent' and `child' amongst themselves,
+as well as to the overall graph.
 
-  (let*
-      ((parent (traverse--tree-parent traverse--current-node)))
-    (if parent
-        (setq traverse--current-node parent)
-      (message "traverse.el: Tree root has no parent!"))))
+A child cannot be its own parent and vice-versa! If `child'
+is the same as `parent', returns `nil'. Returns `t'
+otherwise.
+
+If the `parent' node has no parents,
+sets `traverse--root-node' as its parent.
+
+Establishes the `parent' node as the parent of the `child',
+and the `child' node as a child of the `parent'."
+
+  (if (equal parent child)
+      nil
+    (progn
+      (add-to-list 'traverse--all-child-nodes parent)
+      (add-to-list 'traverse--all-child-nodes child)
+
+      (if (not (traverse--graph-parents parent))
+          (progn
+            (setf (traverse--graph-parents parent) (list traverse--root-node))
+            (setf (traverse--graph-children traverse--root-node)
+                  (cons parent (traverse--graph-children traverse--root-node)))))
+      
+      (setf (traverse--graph-parents child)
+            (cons parent (traverse--graph-parents child)))
+
+      (setf (traverse--graph-children parent)
+            (cons child (traverse--graph-children parent)))
+      
+      t)))
 
 
-(defun traverse-toggle-tree-visualization ()
-  "Visualizes the traverse tree."
+(defun traverse-toggle-graph-visualization ()
+  "Visualizes the traverse graph."
   (interactive)
   (print traverse--root-node t))
 
