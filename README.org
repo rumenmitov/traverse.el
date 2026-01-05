@@ -2,6 +2,10 @@
 #+author: Rumen Mitov
 #+date: [2026-01-05 Mon]
 
+[[https://img.shields.io/github/license/rumenmitov/traverse.el]]
+
+[[https://github.com/rumenmitov/traverse.el/actions/workflows/main.yml/badge.svg]]
+
 Daunted by a large codebase? Lost in a myriad of wrappers and callbacks? These are worries of the past! With *traverse.el* you can map out your path through the codebase like a 16-th century pioneer!
 
 To use it, simply open up a project and enable the minor mode: =M-x traverse-mode=.
