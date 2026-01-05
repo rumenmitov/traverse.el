@@ -92,7 +92,6 @@ current context at point."
 `context', `file' and `line'. If no such node exists,
 returns nil."
 
-  (message "content: %s\nfile: %s\nline: %d\n" context file line)
   (seq-some (lambda (node)
                 (let*
                     ((node-context      (traverse--graph-context  node))
