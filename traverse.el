@@ -74,18 +74,18 @@ to point to the new node."
       ((context             (thing-at-point 'line t))
        (file                (buffer-file-name))
        (line                (line-number-at-pos))
-       (existent-node       (traverse--find-node traverse--root-node context file line)))
+       (existent-node       (traverse--find traverse--root-node context file line)))
 
     (setq traverse--current-node
           (if existent-node
               existent-node
 
             ;; If node does not exist, create it!
-            (traverse--insert-node
+            (traverse--insert
              traverse--current-node context file line)))))
 
 
-(defun traverse--find-node (root context file line)
+(defun traverse--find (root context file line)
   "Returns the node which contains a matching
 `context', `file' and `line'. If no such node exists,
 returns nil.
@@ -116,11 +116,11 @@ The search begins from the node `root'."
       (seq-some
             (lambda (child)
               "Recurse on child."
-              (traverse--find-node child context file line))
+              (traverse--find child context file line))
             root-children))))
 
 
-(defun traverse--insert-node (parent context file line)
+(defun traverse--insert (parent context file line)
   "Saves the `context', `file', and `line' into a new node, and
 adds it as a child to the node `parent'. Returns the new node."
   
