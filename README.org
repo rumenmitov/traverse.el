@@ -2,7 +2,9 @@
 #+author: Rumen Mitov
 #+date: [2026-01-05 Mon]
 
-[[https://img.shields.io/github/license/rumenmitov/traverse.el]]
+#+begin_html
+<img alt="GitHub License" src="https://img.shields.io/github/license/rumenmitov/traverse.el">
+#+end_html
 
 [[https://github.com/rumenmitov/traverse.el/actions/workflows/main.yml/badge.svg]]
 
