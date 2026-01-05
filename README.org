@@ -2,11 +2,11 @@
 #+author: Rumen Mitov
 #+date: [2026-01-05 Mon]
 
-Daunted by a large codebase? Lost in a myriad of wrappers and callbacks? Those are worries of the past! With *traverse.el* you can map out your path through the codebase like a 16-th century pioneer!
+Daunted by a large codebase? Lost in a myriad of wrappers and callbacks? These are worries of the past! With *traverse.el* you can map out your path through the codebase like a 16-th century pioneer!
 
 To use it, simply open up a project and enable the minor mode: =M-x traverse-mode=.
 
-Now jump around the code (back and forth) using =xref-find-definitions= and =xref-go-back=. As you navigate, *traverse-mode* will map out the routes you take (/NOTE: Internally, the so-called "map" is represented as a graph./)!
+Now jump around the code (back and forth) using =xref-find-definitions= and =xref-go-back=. As you navigate, *traverse-mode* will map out the routes you take (/NOTE: Internally, the so-called "map" is represented as a graph/)!
 
 To view the map press: =M-x traverse-toggle-graph-visualization=.
 
@@ -21,5 +21,5 @@ The testing suite can be found in _traverse-tests.el_.
 To run the tests for this package, run:
 
 #+begin_src shell
-  emacs --batch --load ./traverse-tests.el --eval "(ert-run-tests-interactively t)"
+  emacs --batch --load ./traverse-tests.el --funcall ert-run-tests-batch-and-exit
 #+end_src
