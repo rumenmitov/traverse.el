@@ -76,6 +76,5 @@
     ;; NOTE:
     ;; `traverse--find' should work when we have cycles of degree > 1.
 
-    (should (not
-             (equal (traverse--find context file line) nil)))))
+    (should (traverse--find context file line))))
 
